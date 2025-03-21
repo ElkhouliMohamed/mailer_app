@@ -13,9 +13,10 @@ return new class extends Migration
     {
         Schema::create('smtp_settings', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('host');
             $table->integer('port');
-            $table->string('encryption')->nullable(); // TLS/SSL
+            $table->string('encryption')->nullable()->default('tls');
             $table->string('username');
             $table->string('password');
             $table->string('sender_name');

@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 class SmtpSetting extends Model
 {
     protected $fillable = [
-        'host', 'port', 'encryption', 'username', 'password', 'sender_name', 'sender_email'
+        'user_id', 'host', 'port', 'encryption', 'username', 'password', 'sender_name', 'sender_email',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     protected $hidden = ['password'];
 }

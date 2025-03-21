@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
         foreach ($categories as $categoryName) {
             Category::create(['name' => $categoryName]);
         }
-
+        $this->call(\CategorySeeder::class);
         // Seed Contacts
         $contacts = [
             [

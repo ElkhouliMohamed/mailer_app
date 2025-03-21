@@ -9,9 +9,10 @@ class Contact extends Model
 {
     use SoftDeletes;
 
+
     protected $fillable = [
-        'category_id', 'first_name', 'last_name', 'email', 'phone', 'address',
-        'city', 'country', 'interests', 'company', 'position', 'age', 'custom_fields'
+        'category_id', 'first_name', 'last_name', 'email', 'phone', 'address', 'city',
+        'country', 'interests', 'company', 'position', 'age', 'custom_fields'
     ];
 
     protected $casts = [
