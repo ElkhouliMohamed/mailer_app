@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('subject');
             $table->text('content');
             $table->string('status')->default('pending'); // pending, sent, failed
+            $table->string('attachment')->nullable(); // New column for attachment filename
             $table->timestamps();
         });
     }

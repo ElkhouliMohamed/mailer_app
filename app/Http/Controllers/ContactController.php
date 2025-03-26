@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\Contact;
 use App\Models\SmtpSetting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class ContactController extends Controller
@@ -16,12 +18,23 @@ class ContactController extends Controller
         $categories = Category::all();
         $selectedCategory = $request->input('category_id');
         $perPage = $request->input('per_page', 10);
+        $search = $request->input('search'); // Add search input
 
-        $contacts = Contact::when($selectedCategory, function ($query) use ($selectedCategory) {
-            return $query->where('category_id', $selectedCategory);
-        })
-            ->filter($request->all())
-            ->paginate($perPage);
+        $contacts = Contact::query()
+            ->when($selectedCategory, function ($query) use ($selectedCategory) {
+                return $query->where('category_id', $selectedCategory);
+            })
+            ->when($search, function ($query) use ($search) {
+                return $query->where(function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('company', 'like', "%{$search}%");
+                });
+            })
+            ->paginate($perPage)
+            ->appends($request->except('page')); // Preserve query params
 
         return view('contacts.index', compact('contacts', 'categories'));
     }
@@ -32,6 +45,24 @@ class ContactController extends Controller
         return view('contacts.email', compact('contact', 'smtpSettings'));
     }
 
+    // 🔹 Helper Method to Configure SMTP Dynamically
+    private function configureSmtp(SmtpSetting $smtp)
+    {
+        Config::set('mail.mailers.smtp', [
+            'transport' => 'smtp',
+            'host' => $smtp->host,
+            'port' => $smtp->port,
+            'encryption' => $smtp->encryption,
+            'username' => $smtp->username,
+            'password' => $smtp->password,
+        ]);
+
+        Config::set('mail.from', [
+            'address' => $smtp->sender_email,
+            'name' => $smtp->sender_name,
+        ]);
+    }
+
     public function sendEmail(Request $request)
     {
         $request->validate([
@@ -39,6 +70,7 @@ class ContactController extends Controller
             'smtp_setting_id' => 'required|exists:smtp_settings,id',
             'subject' => 'required|string|max:255',
             'content' => 'required|string',
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
         $contact = Contact::findOrFail($request->contact_id);
@@ -56,34 +88,58 @@ class ContactController extends Controller
             'mail.from.name' => $smtp->sender_name,
         ]);
 
-        Mail::to($contact->email)->send(new ContactEmail($request->subject, $request->content));
+        // Prepare the email
+        $email = new ContactEmail($request->subject, $request->content);
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $filePath = $file->getRealPath();
+            $fileName = $file->getClientOriginalName();
+            $email->attach($filePath, [
+                'as' => $fileName,
+                'mime' => $file->getMimeType(),
+            ]);
+        }
 
-        // Log the email (optional, if using email_logs table)
+        // Send email with error handling
+        try {
+            Mail::to($contact->email)->send($email);
+            $status = 'sent';
+            $message = 'Email sent successfully!';
+        } catch (\Exception $e) {
+            $status = 'failed';
+            $message = 'Email failed to send. Please try again.';
+            Log::error('Email sending failed: ' . $e->getMessage()); // This line now works
+        }
+
+        // Log the email
         \App\Models\EmailLog::create([
             'contact_id' => $contact->id,
             'smtp_setting_id' => $smtp->id,
             'subject' => $request->subject,
             'content' => $request->content,
-            'status' => 'sent',
+            'status' => $status,
+            'attachment' => $request->hasFile('attachment') ? $fileName : null,
         ]);
 
-        return redirect()->route('contacts.index')->with('success', 'Email sent successfully!');
+        return redirect()->route('contacts.index')->with('success', $message);
     }
 
     public function bulkSend(Request $request)
     {
         $request->validate([
-            'selected' => 'required|array|max:200', // Limit to 200 emails per send
+            'selected' => 'required|array|min:1|max:200',
+            'selected.*' => 'exists:contacts,id',
             'smtp_setting_id' => 'required|exists:smtp_settings,id',
             'subject' => 'required|string|max:255',
             'content' => 'required|string',
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
-        $contacts = Contact::whereIn('id', $request->selected)->get();
         $smtp = SmtpSetting::findOrFail($request->smtp_setting_id);
 
         // Configure SMTP
         config([
+            'mail.mailers.smtp.transport' => 'smtp',
             'mail.mailers.smtp.host' => $smtp->host,
             'mail.mailers.smtp.port' => $smtp->port,
             'mail.mailers.smtp.encryption' => $smtp->encryption,
@@ -93,18 +149,47 @@ class ContactController extends Controller
             'mail.from.name' => $smtp->sender_name,
         ]);
 
+        $contacts = Contact::whereIn('id', $request->selected)->get();
+        $successCount = 0;
+        $failedCount = 0;
+
         foreach ($contacts as $contact) {
-            Mail::to($contact->email)->send(new ContactEmail($request->subject, $request->content));
+            try {
+                $email = new ContactEmail($request->subject, $request->content);
+
+                if ($request->hasFile('attachment')) {
+                    $file = $request->file('attachment');
+                    $email->attach($file->getRealPath(), [
+                        'as' => $file->getClientOriginalName(),
+                        'mime' => $file->getMimeType(),
+                    ]);
+                }
+
+                Mail::to($contact->email)->send($email);
+                $status = 'sent';
+                $successCount++;
+            } catch (\Exception $e) {
+                $status = 'failed';
+                $failedCount++;
+                Log::error('Bulk email sending failed for contact ID ' . $contact->id . ': ' . $e->getMessage());
+            }
+
             \App\Models\EmailLog::create([
                 'contact_id' => $contact->id,
                 'smtp_setting_id' => $smtp->id,
                 'subject' => $request->subject,
                 'content' => $request->content,
-                'status' => 'sent',
+                'status' => $status,
+                'attachment' => $request->hasFile('attachment') ? $file->getClientOriginalName() : null,
             ]);
         }
 
-        return redirect()->route('contacts.index')->with('success', 'Bulk emails sent successfully!');
+        return redirect()->back()->with([
+            'success' => "Bulk email processing completed. $successCount emails sent successfully." .
+                ($failedCount ? " $failedCount failed." : ''),
+            'success_count' => $successCount,
+            'failed_count' => $failedCount
+        ]);
     }
 
     public function destroy(Contact $contact)
@@ -176,5 +261,44 @@ class ContactController extends Controller
         $contact = Contact::onlyTrashed()->findOrFail($id);
         $contact->forceDelete();
         return redirect()->route('contacts.trashed')->with('success', 'Contact permanently deleted.');
+    }
+
+    /**
+     * Show the import contacts form
+     */
+    public function showImportForm()
+    {
+        return view('contacts.import');
+    }
+
+    /**
+     * Handle the import of contacts from a file
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,xlsx,xls|max:10240', // Max 10MB
+        ]);
+
+        try {
+            Excel::import(new ContactsImport, $request->file('file'));
+            return Redirect::route('contacts.index')->with('success', 'Contacts imported successfully!');
+        } catch (\Exception $e) {
+            return Redirect::route('contacts.import')->with('error', 'Failed to import contacts: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Provide a sample CSV file for download
+     */
+    public function downloadSample()
+    {
+        $filePath = public_path('samples/sample_contacts.csv');
+        if (!file_exists($filePath)) {
+            // Create a sample file if it doesn’t exist
+            $sampleData = "first_name,last_name,email,phone,company,category_id\nJohn,Doe,john.doe@example.com,1234567890,Acme Corp,1\nJane,Smith,jane.smith@example.com,0987654321,Tech Ltd,2";
+            file_put_contents($filePath, $sampleData);
+        }
+        return response()->download($filePath, 'sample_contacts.csv');
     }
 }
