@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name', 'Emailing App') }} - @yield('title', 'Dashboard')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" type="image/png" href="{{ asset('assets/images/favicon.png') }}" sizes="16x16">
+    <link id="logo_page" rel="icon" type="image/png" href="https://www.moncallcenter.ma/images/300/ca-dem7a8695a72kf67d9m219vj6gthjl06122024052450.jpg" sizes="16x16">
     <!-- Tailwind CSS via Vite -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <!-- Wowdash CSS Links -->

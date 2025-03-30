@@ -30,7 +30,8 @@ class ContactController extends Controller
                         ->orWhere('last_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
-                        ->orWhere('company', 'like', "%{$search}%");
+                        ->orWhere('company', 'like', "%{$search}%")
+                        ->orWhere('age', 'like', "%{$search}%");
                 });
             })
             ->paginate($perPage)
