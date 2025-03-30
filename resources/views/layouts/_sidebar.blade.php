@@ -59,6 +59,14 @@
                     <span>Email Logs</span>
                 </a>
             </li>
+            <li>
+                <a href="{{ route('contacts.import-export') }}"
+                   class="{{ request()->routeIs('contacts.import-export') ? 'active' : '' }}"
+                   aria-label="Import/Export Contacts">
+                    <iconify-icon icon="solar:arrow-up-outline" class="menu-icon"></iconify-icon>
+                    <span>Import/Export Contact</span>
+                </a>
+            </li>
 
             @auth
                 <li class="mt-5">

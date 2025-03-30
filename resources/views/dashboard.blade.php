@@ -67,6 +67,33 @@
                     </div>
                 </div>
             </div>
+            <!-- New Email Stats -->
+            <div class="col-md-3">
+                <div class="card radius-12 shadow-xl bg-white dark-bg-neutral-800 p-5 transition-all hover-shadow-2xl">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="w-50-px h-50-px bg-warning-100 dark-bg-warning-900 text-warning-600 dark-text-warning-300 rounded-circle d-flex justify-content-center align-items-center">
+                            <iconify-icon icon="solar:clock-circle-outline" class="text-2xl"></iconify-icon>
+                        </span>
+                        <div>
+                            <h5 class="text-lg fw-semibold text-black dark-text-white mb-1">Emails Pending</h5>
+                            <p class="text-2xl fw-bold text-warning-600 dark-text-warning-300 mb-0">{{ $totalEmailsPending }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card radius-12 shadow-xl bg-white dark-bg-neutral-800 p-5 transition-all hover-shadow-2xl">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="w-50-px h-50-px bg-danger-100 dark-bg-danger-900 text-danger-600 dark-text-danger-300 rounded-circle d-flex justify-content-center align-items-center">
+                            <iconify-icon icon="solar:close-circle-outline" class="text-2xl"></iconify-icon>
+                        </span>
+                        <div>
+                            <h5 class="text-lg fw-semibold text-black dark-text-white mb-1">Emails Failed</h5>
+                            <p class="text-2xl fw-bold text-danger-600 dark-text-danger-300 mb-0">{{ $totalEmailsFailed }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Charts and SMTP Row -->
@@ -78,6 +105,24 @@
                         Contacts by Category
                     </h5>
                     <div id="category-chart" class="h-400-px"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card radius-12 shadow-xl bg-white dark-bg-neutral-800 p-5">
+                    <h5 class="text-xl fw-semibold text-black dark-text-white mb-4">
+                        <iconify-icon icon="solar:pie-chart-outline" class="text-xl align-middle mr-2"></iconify-icon>
+                        Contact Distribution
+                    </h5>
+                    <div id="pie-chart" class="h-400-px"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card radius-12 shadow-xl bg-white dark-bg-neutral-800 p-5">
+                    <h5 class="text-xl fw-semibold text-black dark-text-white mb-4">
+                        <iconify-icon icon="solar:donut-chart-outline" class="text-xl align-middle mr-2"></iconify-icon>
+                        Email Status Distribution
+                    </h5>
+                    <div id="email-status-chart" class="h-400-px"></div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -99,62 +144,66 @@
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                var options = {
-                    chart: {
-                        type: 'bar',
-                        height: 350,
-                        toolbar: { show: false },
-                        background: 'transparent'
-                    },
-                    series: [{
-                        name: 'Contacts',
-                        data: [@foreach($contactsByCategory as $category){{ $category->contacts_count }},@endforeach]
-                    }],
+                // Bar Chart (Contacts by Category)
+                var barOptions = {
+                    chart: { type: 'bar', height: 350, toolbar: { show: false }, background: 'transparent' },
+                    series: [{ name: 'Contacts', data: [@foreach($contactsByCategory as $category){{ $category->contacts_count }},@endforeach] }],
                     xaxis: {
                         categories: [@foreach($contactsByCategory as $category)'{{ $category->name }}', @endforeach],
-                        labels: {
-                            style: {
-                                colors: document.documentElement.getAttribute('data-theme') === 'dark' ? '#d1d5db' : '#6b7280'
-                            }
-                        }
+                        labels: { style: { colors: document.documentElement.getAttribute('data-theme') === 'dark' ? '#d1d5db' : '#6b7280' } }
                     },
-                    yaxis: {
-                        labels: {
-                            style: {
-                                colors: document.documentElement.getAttribute('data-theme') === 'dark' ? '#d1d5db' : '#6b7280'
-                            }
-                        }
-                    },
-                    plotOptions: {
-                        bar: {
-                            borderRadius: 4,
-                            horizontal: false,
-                        }
-                    },
+                    yaxis: { labels: { style: { colors: document.documentElement.getAttribute('data-theme') === 'dark' ? '#d1d5db' : '#6b7280' } } },
+                    plotOptions: { bar: { borderRadius: 4, horizontal: false } },
                     colors: ['#3b82f6'],
                     dataLabels: { enabled: false },
-                    theme: {
-                        mode: document.documentElement.getAttribute('data-theme') || 'light'
-                    }
+                    theme: { mode: document.documentElement.getAttribute('data-theme') || 'light' }
                 };
-                var chart = new ApexCharts(document.querySelector("#category-chart"), options);
-                chart.render();
+                var barChart = new ApexCharts(document.querySelector("#category-chart"), barOptions);
+                barChart.render();
 
-                // Update chart on theme change
-                document.querySelector('[data-theme-toggle]').addEventListener('click', () => {
+                // Pie Chart (Contact Distribution)
+                var pieOptions = {
+                    chart: { type: 'pie', height: 350, background: 'transparent' },
+                    series: [@foreach($contactsByCategory as $category){{ $category->contacts_count }},@endforeach],
+                    labels: [@foreach($contactsByCategory as $category)'{{ $category->name }}', @endforeach],
+                    colors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+                    dataLabels: { enabled: true, style: { colors: ['#fff'] } },
+                    legend: { position: 'bottom', labels: { colors: document.documentElement.getAttribute('data-theme') === 'dark' ? '#d1d5db' : '#6b7280' } },
+                    responsive: [{ breakpoint: 480, options: { chart: { width: 300 }, legend: { position: 'bottom' } } }],
+                    theme: { mode: document.documentElement.getAttribute('data-theme') || 'light' }
+                };
+                var pieChart = new ApexCharts(document.querySelector("#pie-chart"), pieOptions);
+                pieChart.render();
+
+                // Donut Chart (Email Status Distribution)
+                var emailStatusOptions = {
+                    chart: { type: 'donut', height: 350, background: 'transparent' },
+                    series: [@foreach($emailStatuses as $status => $count){{ $count }},@endforeach],
+                    labels: [@foreach($emailStatuses as $status => $count)'{{ $status }}', @endforeach],
+                    colors: ['#10b981', '#ef4444', '#f59e0b'], // Green for sent, Red for failed, Yellow for pending
+                    dataLabels: { enabled: true, style: { colors: ['#fff'] } },
+                    legend: { position: 'bottom', labels: { colors: document.documentElement.getAttribute('data-theme') === 'dark' ? '#d1d5db' : '#6b7280' } },
+                    responsive: [{ breakpoint: 480, options: { chart: { width: 300 }, legend: { position: 'bottom' } } }],
+                    theme: { mode: document.documentElement.getAttribute('data-theme') || 'light' }
+                };
+                var emailStatusChart = new ApexCharts(document.querySelector("#email-status-chart"), emailStatusOptions);
+                emailStatusChart.render();
+
+                // Theme Toggle Updates
+                document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
                     const theme = document.documentElement.getAttribute('data-theme');
-                    chart.updateOptions({
+                    barChart.updateOptions({
                         theme: { mode: theme },
-                        xaxis: {
-                            labels: {
-                                style: { colors: theme === 'dark' ? '#d1d5db' : '#6b7280' }
-                            }
-                        },
-                        yaxis: {
-                            labels: {
-                                style: { colors: theme === 'dark' ? '#d1d5db' : '#6b7280' }
-                            }
-                        }
+                        xaxis: { labels: { style: { colors: theme === 'dark' ? '#d1d5db' : '#6b7280' } } },
+                        yaxis: { labels: { style: { colors: theme === 'dark' ? '#d1d5db' : '#6b7280' } } }
+                    });
+                    pieChart.updateOptions({
+                        theme: { mode: theme },
+                        legend: { labels: { colors: theme === 'dark' ? '#d1d5db' : '#6b7280' } }
+                    });
+                    emailStatusChart.updateOptions({
+                        theme: { mode: theme },
+                        legend: { labels: { colors: theme === 'dark' ? '#d1d5db' : '#6b7280' } }
                     });
                 });
             });

@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SmtpSettingController;
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\BulkEmailController;
+use App\Http\Controllers\ContactImportExportController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +37,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/email-logs/{emailLog}', [EmailLogController::class, 'show'])->name('email-logs.show');
     Route::delete('/email-logs/{emailLog}', [EmailLogController::class, 'destroy'])->name('email-logs.destroy');
     Route::post('/email-logs/{id}/restore', [EmailLogController::class, 'restore'])->name('email-logs.restore');
+
+
+    Route::get('/contacts/import-export', [ContactImportExportController::class, 'index'])->name('contacts.import-export');
+    Route::post('/contacts/import', [ContactImportExportController::class, 'import'])->name('contacts.import');
+    Route::get('/contacts/export', [ContactImportExportController::class, 'export'])->name('contacts.export');
+    Route::get('/contacts/sample', [ContactImportExportController::class, 'downloadSample'])->name('contacts.sample');
 });
 
 require __DIR__.'/auth.php';
